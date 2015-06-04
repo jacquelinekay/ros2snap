@@ -14,7 +14,7 @@ Usage: ros2snap [-rvsh] <ros-pkg-name>
 
 ####Examples:
 
-Compile the ROS package `ros_erle_takeoff_land`, an generate a snap for it.
+Compile the ROS package `ros_erle_takeoff_land`, and generate a snap for it.
 ```bash
 ./ros2snap -rs ros_erle_takeoff_land
 ```
@@ -44,15 +44,14 @@ Index
 
 ###Create a trusty chroot for dev purposes
 
-This repository is based on Martin Pitt's (@martinpitt) work (http://www.piware.de/2015/01/snappy-package-for-robot-operating-system-tutorial/).
-
 ####Creating a chroot with trusty
 
+why are we making a trusty chroot when vivid is needed for Snappy?
+
 ```
+sudo apt-get install qemu-user-static debootstrap dpkg-dev
 mkdir ~/trusty
-qemu-debootstrap --arch=armhf trusty ~/trusty/
-apt-get install qemu-user-static
-sudo cp /usr/bin/qemu-arm-static ~/trusty/usr/bin/
+sudo qemu-debootstrap --arch=armhf trusty ~/trusty/
 sudo mount -o bind /dev ~/trusty/dev
 sudo mount -o bind /proc ~/trusty/proc
 sudo mount -o bind /sys ~/trusty/sys
@@ -131,7 +130,7 @@ sudo apt-get install -y ros-indigo-ros-base ros-indigo-mavros ros-indigo-mavros-
 Add the sources
 ```bash
 cat <<EOF >> /etc/apt/sources.list
-deb http://ppa.launchpad.net/snappy-dev/tools/ubuntu vivid main 
+deb http://ppa.launchpad.net/snappy-dev/tools/ubuntu vivid main
 deb-src http://ppa.launchpad.net/snappy-dev/tools/ubuntu vivid main
 EOF
 
@@ -146,7 +145,9 @@ apt-get source -b snappy-tools
 apt-get install git
 mkdir -p catkin_ws/src
 cd catkin_ws/src
+. /opt/ros/indigo/setup.bash
 catkin_init_workspace
+cd ..
 git clone https://github.com/erlerobot/ros_erle_takeoff_land
  
 catkin_make_isolated --install # or "catkin_make install"
