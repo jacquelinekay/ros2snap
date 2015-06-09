@@ -10,7 +10,7 @@
 # Author: Víctor Mayoral Vilches <victor@erlerobot.com>
 
 VERSION=1.0
-DISTRO=$ROSDISTRO
+DISTRO=$ROS_DISTRO
 : $DISTRO=jade
 USAGE="Usage: `basename $0` [-rvsh] <ros-pkg-name>"
 SNAP=0
@@ -49,6 +49,7 @@ while getopts rvshd: OPT; do
         d)
           DISTRO=$2
           echo "Got distro: $DISTRO"
+          ;;
         \?)
             # getopts issues an error message
             echo $USAGE >&2
