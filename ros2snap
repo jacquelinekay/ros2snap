@@ -1,9 +1,8 @@
 #!/bin/sh
 # Create snappy package from a ROS package including the
 # run dependencies of the corresponding package.
-# Defaults to the "jade" release, but you may specify
-# "indigo" or another release as first command line
-# argument.
+# Defaults to the "jade" release, but you may specify "indigo" or another release
+# using the command line option -d
 #
 # The script should be launched from the root of the catkin overlay
 #
@@ -11,20 +10,20 @@
 # Author: Víctor Mayoral Vilches <victor@erlerobot.com>
 
 VERSION=1.0
-# TODO command line option for changing this
-ROSRELEASE=indigo
+DISTRO=$ROSDISTRO
+: $DISTRO=jade
 USAGE="Usage: `basename $0` [-rvsh] <ros-pkg-name>"
 SNAP=0
 
 if [ $# -eq 0 ]
   then
-    echo "ros2snap [-rvsh] <ros-pkg-name>"
+    echo "ros2snap [-rvshd] <ros-pkg-name>"
     exit 1
 fi
 
 ROSNAME=$1
 
-while getopts rvsh: OPT; do
+while getopts rvshd: OPT; do
     case "$OPT" in
         r)
             echo "compiling the ROS package"
@@ -47,6 +46,9 @@ while getopts rvsh: OPT; do
             echo "		-h: show this help"
             exit 0
             ;;
+        d)
+          DISTRO=$2
+          echo "Got distro: $DISTRO"
         \?)
             # getopts issues an error message
             echo $USAGE >&2
@@ -59,11 +61,15 @@ ROSNAME_FINAL=$(echo $ROSNAME|sed 's/_/-/g')
 echo $ROSNAME_FINAL
 
 # add snappy metadata
+# TODO: Autogenerate snappy metadata, get version and vendor
+# TODO: Traverse bin to get executables
+# TODO: generate binary entries for all launch files found in the package
 mkdir -p install_isolated/meta
+
 cat <<EOF > install_isolated/meta/package.yaml
-name: ros2snap
+name: $ROSNAME_FINAL
 architecture: `dpkg --print-architecture`
-version: 0.1
+version: 1.0
 vendor: Erle Robotics <contact@erlerobot.com>
 binaries:
  - name: bin/$ROSNAME_FINAL
@@ -84,7 +90,7 @@ cat <<EOF > install_isolated/bin/$ROSNAME_FINAL
 mydir=\$(dirname \$(dirname \$0))
 export PYTHONPATH=\$mydir/lib/python2.7/dist-packages:\$PYTHONPATH
 export PATH=\$mydir/bin:\$PATH
-export LD_LIBRARY_PATH=\$mydir/lib:\$mydir/lib/arm-linux-gnueabihf:\$mydir/lib:\$mydir/lib/arm-linux-gnueabihf:/home/ubuntu/trusty/opt/ros/$ROSRELEASE/lib:/home/ubuntu/trusty/usr/lib/arm-linux-gnueabihf:/home/ubuntu/trusty/usr/lib/:/home/ubuntu/trusty/opt/ros/$ROSRELEASE/lib/:\$PYTHONPATH
+export LD_LIBRARY_PATH=\$mydir/lib:\$mydir/lib/arm-linux-gnueabihf:\$mydir/lib:\$mydir/lib/arm-linux-gnueabihf:/home/ubuntu/trusty/opt/ros/$DISTRO/lib:/home/ubuntu/trusty/usr/lib/arm-linux-gnueabihf:/home/ubuntu/trusty/usr/lib/:/home/ubuntu/trusty/opt/ros/$DISTRO/lib/:\$PYTHONPATH
 export ROS_PACKAGE_PATH=\$mydir/share:\$mydir/stacks:\$ROS_PACKAGE_PATH
 . \$mydir/setup.bash
 #rosrun $1 $1
@@ -100,12 +106,13 @@ for DEPNAME in $DEPS
 do
   # TODO differentiate ros and non-ros packages
   # TODO use dpkg to search for package with a substring? if full match, or if remainder of string is ros-indigo, choose it
+  # ^ Use rosdep Python API
   DEPNAME_FINAL=$(echo $DEPNAME|sed 's/_/-/g')
   echo "Computing dependencies for $DEPNAME"
-	for f in `dpkg -L ros-$ROSRELEASE-$DEPNAME_FINAL`;
+	for f in `dpkg -L ros-$DISTRO-$DEPNAME_FINAL`;
 	do [ -f $f ] || continue;
 	 d=${f#/};
-	 directorio=$(dirname $d| sed 's$opt/ros/'+$ROSRELEASE'+/$$')
+	 directorio=$(dirname $d| sed 's$opt/ros/'+$DISTRO'+/$$')
 
 	 mkdir -p install_isolated/$directorio;
 	 cp -a $f install_isolated/$directorio;
@@ -113,7 +120,10 @@ do
 	done
 done
 
+
+
 if [ $SNAP -eq 1 ]; then
 	snappy build install_isolated
+  # TODO check error code
   echo "Successfully built $1 snap"
 fi

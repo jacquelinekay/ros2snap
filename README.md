@@ -6,6 +6,7 @@ snappy apps out of ROS packages
 ```bash
 Usage: ros2snap [-rvsh] <ros-pkg-name>
     -r: compile the ros package"
+    -d: specify ROS distro to use (e.g. indigo, jade)
     -v: version"
     -s: create a snap"
     -h: show this help"
@@ -46,20 +47,20 @@ Index
 
 ####Creating a chroot with trusty
 
-why are we making a trusty chroot when vivid is needed for Snappy?
 
 ```
 sudo apt-get install qemu-user-static debootstrap dpkg-dev
 mkdir ~/trusty
 sudo qemu-debootstrap --arch=armhf trusty ~/trusty/
+sudo cp /usr/bin/qemu-arm-static ~/trusty/usr/bin/
 sudo mount -o bind /dev ~/trusty/dev
 sudo mount -o bind /proc ~/trusty/proc
 sudo mount -o bind /sys ~/trusty/sys
+```
 
 Next comes the magic. This registers the ARM executable format with the QEMU static binary. Thus, the path to qemu-arm-static has to match where it is located on the host and slave systems:
 
-```
-```
+```bash
 echo ':arm:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-arm-static:' > /proc/sys/fs/binfmt_misc/register
 ```
 
@@ -70,7 +71,7 @@ sudo chroot ~/trusty
 ####Installing ROS
 
 ```bash
-sudo update-locale LANG=C LANGUAGE=C LC_ALL=C LC_MESSAGES=POSIX
+update-locale LANG=C LANGUAGE=C LC_ALL=C LC_MESSAGES=POSIX
 ```
 
 Configure `sources.list`
@@ -111,32 +112,31 @@ deb-src http://ports.ubuntu.com/ubuntu-ports/ trusty-security universe
 # deb-src http://ports.ubuntu.com/ubuntu-ports/ trusty-security multiverse
 
 deb http://packages.ros.org/ros/ubuntu trusty main
+
+# Snappy developer tools
+deb http://ppa.launchpad.net/snappy-dev/tools/ubuntu trusty main 
+deb-src http://ppa.launchpad.net/snappy-dev/tools/ubuntu trusty main
 EOF
 ```
 
 ```bash
 apt-get install -y wget
 wget https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O - | sudo apt-key add -
-sudo apt-get update
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F1831DDAFC42E99D
+apt-get update
+apt-get upgrade
 ```
 
 Install ROS (826 MB):
 ```bash
-sudo apt-get install -y ros-indigo-ros-base ros-indigo-mavros ros-indigo-mavros-extras ros-indigo-serial
+apt-get install -y ros-indigo-ros-base ros-indigo-mavros ros-indigo-mavros-extras ros-indigo-serial
 ```
 
 ####Getting snappy-tools (**not working*)
 
-Add the sources
 ```bash
-cat <<EOF >> /etc/apt/sources.list
-deb http://ppa.launchpad.net/snappy-dev/tools/ubuntu vivid main
-deb-src http://ppa.launchpad.net/snappy-dev/tools/ubuntu vivid main
-EOF
-
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F1831DDAFC42E99D
-apt-get update
-apt-get source -b snappy-tools
+# only works if proc, sys, dev are unmounted
+sudo apt-get install snappy-tools
 ```
 
 ####Compiling a ROS package
@@ -200,7 +200,7 @@ instead, append "indigo" to the above build.sh command line.
  - Start the snappy VM/instance. See
    http://www.ubuntu.com/cloud/tools/snappy#snappy-local for details.
 
- - Install the snapp on your snappy VM:
+ - Install the snap on your snappy VM:
 
        snappy-remote --url=ssh://localhost:8022 install /tmp/ros/ros-tutorial_0.3_amd64.snap
 
