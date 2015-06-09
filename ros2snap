@@ -6,9 +6,16 @@
 # using the command line option -d.
 #
 # The script should be launched from the root of the catkin overlay
+# TODO add support for building arbitrary installed packages, not dependent on
+# location
 #
 # (C) 2015 Erle Robotics S.L.
-# Author: Víctor Mayoral Vilches <victor@erlerobot.com>
+# Authors: Víctor Mayoral Vilches <victor@erlerobot.com>
+#          Jackie Kay <jackie@osrfoundation.org>
+
+# TODO current approach only works with one filesystem level (does not work
+# with stacks)
+# TODO check if replacing cp with symlink works
 
 VERSION=1.0
 DISTRO=$ROS_DISTRO
@@ -75,7 +82,7 @@ VENDOR_EMAIL=$(grep -oPm1 "(?<=<maintainer email=\")[^\"]+" <<< "$PKG_DATA")
 # Generate binary entries for all launch files
 #BINARIES=" - name: bin/$ROSNAME_FINAL"
 BINARIES=""
-# TODO suppress if no launchfiles found
+# TODO suppress error if no launchfiles found
 #for LAUNCHFILE in $(ls src/$ROSNAME/launch); do
   # how to add executable for launchfile?
   #echo roslaunch $ROSNAME $LAUNCHFILE >> snappy_build/bin/$LAUNCHFILE
@@ -108,29 +115,26 @@ EOF
 
 # FIXME: add wrapper to make deb lib packages work from /apps/... (will be
 # fixed once we do proper overlay mounting of /debs into the app ns)
-#cat <<EOF > snappy_build/bin/$ROSNAME_FINAL
-##!/bin/bash -e
-#mydir=\$(dirname \$(dirname \$0))
-#export PYTHONPATH=\$mydir/lib/python2.7/dist-packages:\$PYTHONPATH
-#export PATH=\$mydir/bin:\$PATH
-#export LD_LIBRARY_PATH=\$mydir/lib:\$mydir/lib/arm-linux-gnueabihf:\$mydir/lib:\$mydir/lib/arm-linux-gnueabihf:/home/ubuntu/trusty/opt/ros/$DISTRO/lib:/home/ubuntu/trusty/usr/lib/arm-linux-gnueabihf:/home/ubuntu/trusty/usr/lib/:/home/ubuntu/trusty/opt/ros/$DISTRO/lib/:\$PYTHONPATH
-#export ROS_PACKAGE_PATH=\$mydir/share:\$mydir/stacks:\$ROS_PACKAGE_PATH
-#. \$mydir/opt/ros/$DISTRO/setup.bash
-##rosrun $1 $1
-##\$mydir/lib/$1/$1
-#EOF
-#chmod 755 snappy_build/bin/$ROSNAME_FINAL
-#
+cat <<EOF > snappy_build/bin/$ROSNAME_FINAL
+#!/bin/bash -e
+mydir=\$(dirname \$(dirname \$0))
+export PYTHONPATH=\$mydir/lib/python2.7/dist-packages:\$PYTHONPATH
+export PATH=\$mydir/bin:\$PATH
+export LD_LIBRARY_PATH=\$mydir/lib:\$mydir/lib/arm-linux-gnueabihf:\$mydir/lib:\$mydir/lib/arm-linux-gnueabihf:/home/ubuntu/trusty/opt/ros/$DISTRO/lib:/home/ubuntu/trusty/usr/lib/arm-linux-gnueabihf:/home/ubuntu/trusty/usr/lib/:/home/ubuntu/trusty/opt/ros/$DISTRO/lib/:\$PYTHONPATH
+export ROS_PACKAGE_PATH=\$mydir/share:\$mydir/stacks:\$ROS_PACKAGE_PATH
+. \$mydir/opt/ros/$DISTRO/setup.bash
+#rosrun $1 $1
+#\$mydir/lib/$1/$1
+EOF
+chmod 755 snappy_build/bin/$ROSNAME_FINAL
+
 
 # Figure out run dependencies of the ROS package and add them
-# TODO check error message from rosdep
-DEPS=`rosdep keys $ROSNAME`
+# TODO check error message from rosdep resolve
+# TODO inject core dependencies? Still not sure which ones are needed
+DEPS=$(cat src/$ROSNAME/package.xml | grep -v "<!" |  grep -oP '(?<=run_depend>)[^<]+')
 for DEPNAME in $DEPS
 do
-  # TODO differentiate ros and non-ros packages
-  # TODO use dpkg to search for package with a substring? if full match, or if remainder of string is ros-indigo, choose it
-  # ^ Use rosdep Python API
-  #DEPNAME_FINAL=$(echo $DEPNAME|sed 's/_/-/g')
   DEPNAME_FINAL=`rosdep resolve $DEPNAME | sed -n 2p`
   echo "Adding dependency $DEPNAME_FINAL"
 	for f in `dpkg -L $DEPNAME_FINAL`;
@@ -140,11 +144,9 @@ do
 
 	 mkdir -p snappy_build/$directorio;
 	 cp -a $f snappy_build/$directorio;
-	 #echo "copying $f in install_isolated/$directorio"
+	 echo "copying $f in install_isolated/$directorio"
 	done
 done
-
-
 
 if [ $SNAP -eq 1 ]; then
 	snappy build snappy_build
