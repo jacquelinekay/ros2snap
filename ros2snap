@@ -15,7 +15,8 @@
 
 # TODO current approach only works with one filesystem level (does not work
 # with stacks)
-# TODO check if replacing cp with symlink works
+# consider making subdirs of snappy_build to mirror catkin ws
+# TODO check if replacing cp with symlink works (it should)
 
 VERSION=1.0
 DISTRO=$ROS_DISTRO
@@ -72,7 +73,9 @@ echo $ROSNAME_FINAL
 
 # add snappy metadata
 mkdir -p snappy_build/meta
+mkdir -p snappy_build/lib
 mkdir -p snappy_build/bin
+cp -r install/lib/* snappy_build/lib
 
 PKG_DATA=$(cat src/$ROSNAME/package.xml)
 SNAP_VERSION=$(grep -oPm1 "(?<=<version>)[^<]+" <<< "$PKG_DATA")
@@ -81,17 +84,20 @@ VENDOR_EMAIL=$(grep -oPm1 "(?<=<maintainer email=\")[^\"]+" <<< "$PKG_DATA")
 
 # Generate binary entries for all launch files
 #BINARIES=" - name: bin/$ROSNAME_FINAL"
-BINARIES=""
+BINARIES=" - name: bin/$ROSNAME_FINAL-wrapper"
 # TODO suppress error if no launchfiles found
-#for LAUNCHFILE in $(ls src/$ROSNAME/launch); do
-  # how to add executable for launchfile?
-  #echo roslaunch $ROSNAME $LAUNCHFILE >> snappy_build/bin/$LAUNCHFILE
+for LAUNCHFILE in $(ls src/$ROSNAME/launch); do
+ # how to add executable for launchfile?
+ echo ". \$(dirname \$(dirname \$0))/opt/ros/$DISTRO/setup.bash\ roslaunch $ROSNAME $LAUNCHFILE" >> snappy_build/bin/$LAUNCHFILE
 
-  #BINARIES="$BINARIES
-# - name: bin/$LAUNCHFILE"
-#done
+ BINARIES="$BINARIES
+ - name: bin/$LAUNCHFILE"
+done
 
-# TODO: get entries in bin and generate binary entries
+# TODO: generate binary entries for:
+# executables in bin and lib (?)
+# scripts stored in share (?)
+
 for BINFILE in $(ls install/bin); do
   cp install/bin/$BINFILE snappy_build/bin
   BINARIES="$BINARIES
@@ -103,7 +109,8 @@ name: $ROSNAME_FINAL
 architecture: `dpkg --print-architecture`
 version: $SNAP_VERSION
 vendor: <$VENDOR_EMAIL>
-binaries:$BINARIES
+binaries:
+$BINARIES
 EOF
 
 cat <<EOF > snappy_build/meta/readme.md
@@ -115,7 +122,7 @@ EOF
 
 # FIXME: add wrapper to make deb lib packages work from /apps/... (will be
 # fixed once we do proper overlay mounting of /debs into the app ns)
-cat <<EOF > snappy_build/bin/$ROSNAME_FINAL
+cat <<EOF > snappy_build/bin/$ROSNAME_FINAL-wrapper
 #!/bin/bash -e
 mydir=\$(dirname \$(dirname \$0))
 export PYTHONPATH=\$mydir/lib/python2.7/dist-packages:\$PYTHONPATH
@@ -124,7 +131,7 @@ export LD_LIBRARY_PATH=\$mydir/lib:\$mydir/lib/arm-linux-gnueabihf:\$mydir/lib:\
 export ROS_PACKAGE_PATH=\$mydir/share:\$mydir/stacks:\$ROS_PACKAGE_PATH
 . \$mydir/opt/ros/$DISTRO/setup.bash
 #rosrun $1 $1
-#\$mydir/lib/$1/$1
+\$mydir/lib/$ROSNAME/$1/$1
 EOF
 chmod 755 snappy_build/bin/$ROSNAME_FINAL
 
@@ -144,7 +151,7 @@ do
 
 	 mkdir -p snappy_build/$directorio;
 	 cp -a $f snappy_build/$directorio;
-	 echo "copying $f in install_isolated/$directorio"
+	 #echo "copying $f in snappy_build/$directorio"
 	done
 done
 
